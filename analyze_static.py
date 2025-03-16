@@ -5,7 +5,6 @@ from topk.online import online_diverse_selection
 import topk.diversity_metrics
 import numpy as np
 import matplotlib.pyplot as plt
-import heapq
 import math
 import random
 
@@ -175,4 +174,4 @@ def main2():
 
 
 if __name__ == '__main__':
-    main2()
+    main()

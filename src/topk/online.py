@@ -2,6 +2,36 @@ import math
 import heapq
 
 
+class Heap:
+    def __init__(self, capacity: int):
+        self._capacity = capacity
+        self._list = []
+
+    def pop(self):
+        return heapq.heappop(self._list)
+
+    def push(self, item, item_id):
+        if len(self._list) == self._capacity:
+            if not self.is_empty() and item > self._list[0][0]:
+                self.pop()
+            else:
+                return
+        heapq.heappush(self._list, (item, item_id))
+
+    def is_empty(self):
+        return len(self._list) == 0
+
+    def min_value(self):
+        if self.is_empty():
+            return -1.0
+        return self._list[0][0]
+
+    # def complete_minus_1(self):
+    #     self._list = [(-1.0, -1)] * (self._capacity - len(self._list)) + self._list
+
+
+
+
 def online_diverse_selection(items, K, diversity_constraints, warmup_ratio = 1.0):
     """
     Implements the online version of the diverse selection algorithm.
@@ -21,29 +51,33 @@ def online_diverse_selection(items, K, diversity_constraints, warmup_ratio = 1.0
         category_count[category] += 1
 
     R = {category: math.floor(warmup_ratio * (category_count[category] / math.e)) for category in diversity_constraints}
-    heaps = {category: [(floor, -1)] for category, (floor, ceil) in diversity_constraints.items()}
+    heaps = {category: Heap(capacity=floor) for category, (floor, _) in diversity_constraints.items()}
 
     floor_sum = sum(f for f, _ in diversity_constraints.values())
     slack = K - floor_sum
     N = len(items)
     r = math.floor(warmup_ratio * (N / math.e))
-    T = [(slack, -1)]  # TODO maybe replace -1 with if statement
+    T = Heap(capacity=slack)
     total_seen = 0
 
     for score, category, item_id in items:
         floor, ceil = diversity_constraints[category]
         if total_seen < r:
-            heapq.heappush(T, (score, item_id))
+            T.push(score, item_id)
         if visited_categories[category] < R[category]:
-            heapq.heappush(heaps[category], (score, item_id))
+            heaps[category].push(score, item_id)
         # ((ki < floori)∧(score(x) > дetMinElement(Ti))∨(ni −mi == floori −ki)
-        elif (num_items_category[category] < floor and score > heaps[category][0][0]) or category_count[category] - \
+        elif (num_items_category[category] < floor and score > heaps[category].min_value()) or category_count[category] - \
                 visited_categories[category] == floor - num_items_category[category]:
-            heapq.heappop(heaps[category])
+
+            if not heaps[category].is_empty():
+                heaps[category].pop()
+
             selected.append(item_id)
             num_items_category[category] += 1
-        elif total_seen >= r and score > T[0][0] and num_items_category[category] < ceil and slack > 0:
-            heapq.heappop(T)
+        elif total_seen >= r and score > T.min_value() and num_items_category[category] < ceil and slack > 0:
+            if not T.is_empty():
+                T.pop()
             selected.append(item_id)
             num_items_category[category] += 1
             slack -= 1
