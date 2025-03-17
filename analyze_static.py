@@ -53,8 +53,7 @@ def calc_accuracy(min_val, optimal_sol, sub_optimal):
     return sum1 / sum2
 
 
-def main():
-    items, K, diversity_constraints = prepare_data(K=10)
+def main(items, K, diversity_constraints):
     print(diversity_constraints)
     items.sort(reverse=True)
     items_dict = {id_: (score, category) for score, category, id_ in items}
@@ -116,7 +115,7 @@ def main():
         axs[i].legend()  # Show legend
 
     plt.tight_layout()
-    plt.show()
+    # plt.show()
 
 
 def main2():
@@ -174,4 +173,4 @@ def main2():
 
 
 if __name__ == '__main__':
-    main()
+    main(*prepare_data(K=4))
