@@ -36,8 +36,14 @@ def dataset_configuration(dataframe: pd.DataFrame, default_score=None, default_s
 
     df_columns = list(dataframe.columns)
 
-    st.selectbox("Score Column", df_columns, key="score_column", index=df_columns.index(default_score))
-    st.multiselect("Sensitive Columns", df_columns, key="sensitive_columns", default=default_sensitives)
+    default_index = None
+    if default_score is not None:
+        default_index = df_columns.index(default_score)
+
+    st.selectbox("Score Column", df_columns, key="score_column", index=default_index)
+    if st.session_state.score_column is None:
+        return None
+    st.multiselect("Sensitive Columns", [col for col in df_columns if col != st.session_state.score_column], key="sensitive_columns", default=default_sensitives)
 
     column_category_counts = {col: dataframe[col].value_counts() for col in st.session_state.sensitive_columns}
 
@@ -77,19 +83,31 @@ def app():
     st.write("## Dataset Configuration")
     st.radio("Dataset", ["netflix", "sat", "nasa", "other"], key="dataset", index=2)
 
-    if st.session_state.dataset == "other":
-        st.file_uploader("file", type="csv")
-
     max_K = None
+
+    if st.session_state.dataset == "other":
+        st.file_uploader("file", type="csv", key="dataset_file")
+        try:
+            other_dataset = pd.read_csv(st.session_state.dataset_file)
+            result = dataset_configuration(other_dataset)
+            if result is not None:
+                filtered_dataframe, counts = result
+                max_K = len(filtered_dataframe)
+        except ValueError as e:
+            pass
+
 
     if st.session_state.dataset == "nasa":
         astronauts = pd.read_csv("astronauts.csv")
-        filtered_dataframe, counts = dataset_configuration(
+        result = dataset_configuration(
             astronauts,
             default_score="Space Flight (hr)",
             default_sensitives={"Undergraduate Major": 9},
         )
-        max_K = len(filtered_dataframe)
+        if result is not None:
+            filtered_dataframe, counts = result
+            max_K = len(filtered_dataframe)
+
 
     st.write("## Algorithm Configuration")
     if max_K is not None:
