@@ -29,9 +29,6 @@ def prepare_data(K, constraint_algorithm=topk.diversity_metrics.assign_average_d
     # Extract relevant columns (Score, Category, ID)
     df_filtered = df[['Name', 'Space Flight (hr)', 'Major Category']]
 
-    # Sort the dataset by space flight hours (score) in descending order
-    df_filtered = df_filtered.sort_values(by='Space Flight (hr)', ascending=False)
-
     # Step 2: Define Diversity Constraints (floor = 1, ceil = min(count, 5))
     counts = {category: len(category_df) for category, category_df in df.groupby('Major Category')}
     if relaxed:
@@ -55,7 +52,7 @@ def calc_accuracy(min_val, optimal_sol, sub_optimal):
 
 def main(items, K, diversity_constraints):
     print(diversity_constraints)
-    items.sort(reverse=True)
+    items.sort(reverse=True, key=lambda x: x[0])
     items_dict = {id_: (score, category) for score, category, id_ in items}
     print(len(items))
 
@@ -76,6 +73,8 @@ def main(items, K, diversity_constraints):
         for run in range(100):
             random.shuffle(items)
             selected, walking_distance = online_diverse_selection(items, K, diversity_constraints, factor)
+            if len(selected) < K:
+                continue
             scores = [items_dict[i][0] for i in selected]
             accuracy_factor.append(calc_accuracy(min_val, optimal_scores, scores))
             if accuracy_factor[-1] > 1.0:
@@ -106,7 +105,13 @@ def main(items, K, diversity_constraints):
             axs[i].plot(x_range, poly1d_fn(x_range), color='red', linestyle="-", label="Trend Line")
 
         # Formatting
-        axs[i].set_xlim(left=0, right=400)  # Ensures x-axis starts from 0
+        right_max = None
+        for l in  walking_distance_results:
+            if l:
+                right_max = max(l)
+        if right_max is not None:
+            right_max = math.ceil(1.1*right_max)
+        axs[i].set_xlim(left=0, right=right_max)  # Ensures x-axis starts from 0
         axs[i].set_ylim(bottom=0, top=1.1)  # Ensures y-axis starts from 0
         axs[i].set_xlabel("Walking Distance (Number of Items Examined)")
         axs[i].set_ylabel("Accuracy (Selected Score / Best Possible Score)")
@@ -114,22 +119,14 @@ def main(items, K, diversity_constraints):
         axs[i].grid(True)
         axs[i].legend()  # Show legend
 
-    plt.tight_layout()
+    return fig
+    # plt.tight_layout()
     # plt.show()
 
 
-def main2():
-    constraints_dict = {
-        "min": (topk.diversity_metrics.assign_minimum_diversity, False),
-        "average": (topk.diversity_metrics.assign_average_diversity, False),
-        "proportion": (topk.diversity_metrics.assign_proportion_diversity, False),
-        "relaxed_average": (topk.diversity_metrics.assign_relaxed_average_diversity, True),
-        "relaxed_proportion": (topk.diversity_metrics.assign_relaxed_proportion_diversity, True),
-    }
-
+def main2(inputs: dict[str, tuple[any, any, any]]):
     constaint_results={}
-    for constraint_name,(constraint_algorithm, relaxed) in constraints_dict.items():
-        items, K, diversity_constraints = prepare_data(10, constraint_algorithm,relaxed)
+    for constraint_name, (items, K, diversity_constraints) in inputs.items():
         items.sort(reverse=True)
         items_dict = {id_: (score, category) for score, category, id_ in items}
         optimal_solution = diverse_top_k(items, K, diversity_constraints)
@@ -169,8 +166,10 @@ def main2():
     ax.legend()  # Show legend for constraint names
     ax.grid(True)
 
-    plt.show()
+    return fig
 
 
 if __name__ == '__main__':
-    main(*prepare_data(K=4))
+    main(*prepare_data(K=40))
+    plt.show()
+    # main2()

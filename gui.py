@@ -108,29 +108,99 @@ def app():
             filtered_dataframe, counts = result
             max_K = len(filtered_dataframe)
 
+    if st.session_state.dataset == "netflix":
+        astronauts = pd.read_csv("datasets/Netflix TV Shows and Movies Binned.csv")
+        result = dataset_configuration(
+            astronauts,
+            default_score="imdb_score",
+            default_sensitives={
+                "age_certification": 7,
+                "release_decade": 7,
+            },
+        )
+        if result is not None:
+            filtered_dataframe, counts = result
+            max_K = len(filtered_dataframe)
+
+    if st.session_state.dataset == "sat":
+        astronauts = pd.read_csv("datasets/scores_backup1.csv")
+        result = dataset_configuration(
+            astronauts,
+            default_score="Average Score (SAT Math)",
+            default_sensitives={"City": 10},
+        )
+        if result is not None:
+            filtered_dataframe, counts = result
+            max_K = len(filtered_dataframe)
+
 
     st.write("## Algorithm Configuration")
-    if max_K is not None:
-        number_input("K", key="K", value=4, step=1, min_value=1, max_value=max_K)
-        st.radio("Constraint", CONSTRAINT_ALGORITHMS, key="constraint")
 
-        constraint_algorithm, relaxed = CONSTRAINT_ALGORITHMS[st.session_state.constraint]
+    experiment = st.radio("Experiment", ["Warmup Period", "Comparison"])
 
-        if relaxed:
-            number_input("t", key="t", min_value=0.0, value=float(math.floor(st.session_state.K * .3)))
-            diversity_constraints = constraint_algorithm(st.session_state.K, counts, st.session_state.t)
-        else:
-            diversity_constraints = constraint_algorithm(st.session_state.K, counts)
+    if experiment == "Warmup Period":
+        if max_K is not None:
+            number_input("K", key="K", value=10, step=1, min_value=1, max_value=max_K)
+            st.radio("Constraint", CONSTRAINT_ALGORITHMS, key="constraint")
 
-        items = list(zip(
-            filtered_dataframe["score"],
-            filtered_dataframe[[col for col in filtered_dataframe.columns if col != "score"]].itertuples(index=False),
-            filtered_dataframe.index)
-        )
 
-        from analyze_static import main
-        main(items, st.session_state.K, diversity_constraints)
-        st.pyplot()
+            constraint_algorithm, relaxed = CONSTRAINT_ALGORITHMS[st.session_state.constraint]
+
+            if relaxed:
+                number_input("t", key="t", min_value=0, value=math.floor(st.session_state.K * .3))
+                diversity_constraints = constraint_algorithm(st.session_state.K, counts, st.session_state.t)
+            else:
+                diversity_constraints = constraint_algorithm(st.session_state.K, counts)
+
+            items = list(zip(
+                filtered_dataframe["score"],
+                filtered_dataframe[[col for col in filtered_dataframe.columns if col != "score"]].itertuples(index=False),
+                filtered_dataframe.index)
+            )
+
+            from analyze_static import main
+            fig = main(items, st.session_state.K, diversity_constraints)
+            st.pyplot(fig)
+    else:
+        if max_K is not None:
+            number_input("K", key="K", value=4, step=1, min_value=1, max_value=max_K)
+
+            items = list(zip(
+                filtered_dataframe["score"],
+                filtered_dataframe[[col for col in filtered_dataframe.columns if col != "score"]].itertuples(
+                    index=False),
+                filtered_dataframe.index)
+            )
+
+            constraints_dict = {
+                "min": (topk.diversity_metrics.assign_minimum_diversity, False),
+                "average": (topk.diversity_metrics.assign_average_diversity, False),
+                "proportion": (topk.diversity_metrics.assign_proportion_diversity, False),
+                "relaxed_average": (topk.diversity_metrics.assign_relaxed_average_diversity, True),
+                "relaxed_proportion": (topk.diversity_metrics.assign_relaxed_proportion_diversity, True),
+            }
+
+            inputs = {}
+            for constraint_name, (constraint_algorithm, relaxed) in constraints_dict.items():
+                if relaxed:
+                    diversity_constraints = constraint_algorithm(st.session_state.K, counts,
+                                                                 math.floor(st.session_state.K * .3))
+                else:
+                    diversity_constraints = constraint_algorithm(st.session_state.K, counts)
+
+                items = list(zip(
+                    filtered_dataframe["score"],
+                    filtered_dataframe[[col for col in filtered_dataframe.columns if col != "score"]].itertuples(
+                        index=False),
+                    filtered_dataframe.index)
+                )
+
+                inputs[constraint_name] = items, st.session_state.K, diversity_constraints
+
+            from analyze_static import main2
+            fig = main2(inputs)
+            st.pyplot(fig)
+
 
 
 if __name__ == '__main__':
